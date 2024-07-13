@@ -1,0 +1,14 @@
+wipe     = true
+no-context = true
+no-hooks = true
+no-tests = true
+add-global-variants = true
+
+[psql]
+  dbname = "postgres"
+  host   = "db"
+  user   = "postgres"
+  pass   = "postgres"
+  sslmode = "disable"
+
+  blacklist = ["schema_migrations"]
