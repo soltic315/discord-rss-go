@@ -4,9 +4,11 @@
 package models
 
 var TableNames = struct {
-	Articles string
-	Feeds    string
+	Articles      string
+	Feeds         string
+	Subscriptions string
 }{
-	Articles: "articles",
-	Feeds:    "feeds",
+	Articles:      "articles",
+	Feeds:         "feeds",
+	Subscriptions: "subscriptions",
 }

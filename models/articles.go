@@ -28,6 +28,7 @@ type Article struct {
 	Title       string    `boil:"title" json:"title" toml:"title" yaml:"title"`
 	Link        string    `boil:"link" json:"link" toml:"link" yaml:"link"`
 	PublishedAt time.Time `boil:"published_at" json:"published_at" toml:"published_at" yaml:"published_at"`
+	NeedNotify  bool      `boil:"need_notify" json:"need_notify" toml:"need_notify" yaml:"need_notify"`
 	CreatedAt   null.Time `boil:"created_at" json:"created_at,omitempty" toml:"created_at" yaml:"created_at,omitempty"`
 
 	R *articleR `boil:"-" json:"-" toml:"-" yaml:"-"`
@@ -40,6 +41,7 @@ var ArticleColumns = struct {
 	Title       string
 	Link        string
 	PublishedAt string
+	NeedNotify  string
 	CreatedAt   string
 }{
 	ArticleID:   "article_id",
@@ -47,6 +49,7 @@ var ArticleColumns = struct {
 	Title:       "title",
 	Link:        "link",
 	PublishedAt: "published_at",
+	NeedNotify:  "need_notify",
 	CreatedAt:   "created_at",
 }
 
@@ -105,6 +108,15 @@ func (w whereHelpertime_Time) GTE(x time.Time) qm.QueryMod {
 	return qmhelper.Where(w.field, qmhelper.GTE, x)
 }
 
+type whereHelperbool struct{ field string }
+
+func (w whereHelperbool) EQ(x bool) qm.QueryMod  { return qmhelper.Where(w.field, qmhelper.EQ, x) }
+func (w whereHelperbool) NEQ(x bool) qm.QueryMod { return qmhelper.Where(w.field, qmhelper.NEQ, x) }
+func (w whereHelperbool) LT(x bool) qm.QueryMod  { return qmhelper.Where(w.field, qmhelper.LT, x) }
+func (w whereHelperbool) LTE(x bool) qm.QueryMod { return qmhelper.Where(w.field, qmhelper.LTE, x) }
+func (w whereHelperbool) GT(x bool) qm.QueryMod  { return qmhelper.Where(w.field, qmhelper.GT, x) }
+func (w whereHelperbool) GTE(x bool) qm.QueryMod { return qmhelper.Where(w.field, qmhelper.GTE, x) }
+
 type whereHelpernull_Time struct{ field string }
 
 func (w whereHelpernull_Time) EQ(x null.Time) qm.QueryMod {
@@ -134,6 +146,7 @@ var ArticleWhere = struct {
 	Title       whereHelperstring
 	Link        whereHelperstring
 	PublishedAt whereHelpertime_Time
+	NeedNotify  whereHelperbool
 	CreatedAt   whereHelpernull_Time
 }{
 	ArticleID:   whereHelperint{field: "\"articles\".\"article_id\""},
@@ -141,6 +154,7 @@ var ArticleWhere = struct {
 	Title:       whereHelperstring{field: "\"articles\".\"title\""},
 	Link:        whereHelperstring{field: "\"articles\".\"link\""},
 	PublishedAt: whereHelpertime_Time{field: "\"articles\".\"published_at\""},
+	NeedNotify:  whereHelperbool{field: "\"articles\".\"need_notify\""},
 	CreatedAt:   whereHelpernull_Time{field: "\"articles\".\"created_at\""},
 }
 
@@ -165,8 +179,8 @@ func (*articleR) NewStruct() *articleR {
 type articleL struct{}
 
 var (
-	articleAllColumns            = []string{"article_id", "feed_id", "title", "link", "published_at", "created_at"}
-	articleColumnsWithoutDefault = []string{"feed_id", "title", "link", "published_at"}
+	articleAllColumns            = []string{"article_id", "feed_id", "title", "link", "published_at", "need_notify", "created_at"}
+	articleColumnsWithoutDefault = []string{"feed_id", "title", "link", "published_at", "need_notify"}
 	articleColumnsWithDefault    = []string{"article_id", "created_at"}
 	articlePrimaryKeyColumns     = []string{"article_id"}
 )

@@ -10,7 +10,6 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
       BOT_TOKEN: ${BOT_TOKEN}
-      CHANNEL_ID: ${CHANNEL_ID}
     restart: always
   db:
     image: postgres:latest

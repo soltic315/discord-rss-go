@@ -25,7 +25,6 @@ var (
 	DBPort     = os.Getenv("DB_PORT")
 
 	BotToken         = os.Getenv("BOT_TOKEN")
-	ChannelID        = os.Getenv("CHANNEL_ID")
 	CrawlingInterval = 1
 )
 
@@ -48,9 +47,85 @@ func init() {
 		defer ticker.Stop()
 
 		for range ticker.C {
-			crawl()
+			crawlingJob()
+			notificationJob()
 		}
 	}()
+}
+
+func commandHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if i.Type == discordgo.InteractionApplicationCommand {
+		var content string
+		channelID := i.ChannelID
+		userName := i.Member.User.Username
+
+		options := i.ApplicationCommandData().Options
+		if len(options) > 0 {
+			switch options[0].Name {
+			case "subscribe":
+				options = options[0].Options
+				url := options[0].StringValue()
+				content = feedSubscribeCommand(url, channelID, userName)
+			case "list":
+				content = feedListCommand(channelID)
+			case "remove":
+				options = options[0].Options
+				subscriptionID := int(options[0].IntValue())
+				content = feedRemoveCommand(subscriptionID)
+			}
+
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: content,
+					Flags:   discordgo.MessageFlagsEphemeral,
+				},
+			})
+		}
+	}
+}
+
+func createCommand() *discordgo.ApplicationCommand {
+	childCommands := []*discordgo.ApplicationCommandOption{
+		{
+			Name:        "subscribe",
+			Description: "このチャンネルでフィードを購読したい場合 :（入力例）/feed subscribe http://kotaku.com/vip.xml",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "url",
+					Description: "url",
+					Required:    true,
+				},
+			},
+			Type: discordgo.ApplicationCommandOptionSubCommand,
+		},
+		{
+			Name:        "list",
+			Description: "このチャンネルで購読しているフィードを一覧表示する場合 : /feed list",
+			Type:        discordgo.ApplicationCommandOptionSubCommand,
+		},
+		{
+			Name:        "remove",
+			Description: "このチャンネルからフィードを削除する場合 : /feed remove フィードID",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionInteger,
+					Name:        "feed_id",
+					Description: "feed_id",
+					Required:    true,
+				},
+			},
+			Type: discordgo.ApplicationCommandOptionSubCommand,
+		},
+	}
+	parentCommand := &discordgo.ApplicationCommand{
+		Name:        "feed",
+		Description: "有効なコマンド : subscribe、list、remove",
+		Options:     childCommands,
+	}
+
+	return parentCommand
 }
 
 func main() {
@@ -61,16 +136,17 @@ func main() {
 	)
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		slog.Error("error", err)
+		slog.Error("Error occurred", "error", err)
 		panic(err)
 	}
 	defer db.Close()
 	boil.SetDB(db)
+	boil.DebugMode = *DebugMode
 
-	// Setup BOT
+	// Setup Bot
 	s, err = discordgo.New("Bot " + BotToken)
 	if err != nil {
-		slog.Error("error", err)
+		slog.Error("Error occurred", "error", err)
 		panic(err)
 	}
 
@@ -78,18 +154,16 @@ func main() {
 
 	err = s.Open()
 	if err != nil {
-		slog.Error("error", err)
+		slog.Error("Error occurred", "error", err)
 		panic(err)
 	}
 	defer s.Close()
 
 	_, err = s.ApplicationCommandCreate(s.State.User.ID, "", createCommand())
 	if err != nil {
-		slog.Error("error", err)
+		slog.Error("Error occurred", "error", err)
 		panic(err)
 	}
-
-	slog.Info("Bot running")
 
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)

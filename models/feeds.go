@@ -60,14 +60,17 @@ var FeedWhere = struct {
 
 // FeedRels is where relationship names are stored.
 var FeedRels = struct {
-	Articles string
+	Articles      string
+	Subscriptions string
 }{
-	Articles: "Articles",
+	Articles:      "Articles",
+	Subscriptions: "Subscriptions",
 }
 
 // feedR is where relationships are stored.
 type feedR struct {
-	Articles ArticleSlice
+	Articles      ArticleSlice
+	Subscriptions SubscriptionSlice
 }
 
 // NewStruct creates a new relationship struct
@@ -217,6 +220,27 @@ func (o *Feed) Articles(mods ...qm.QueryMod) articleQuery {
 	return query
 }
 
+// Subscriptions retrieves all the subscription's Subscriptions with an executor.
+func (o *Feed) Subscriptions(mods ...qm.QueryMod) subscriptionQuery {
+	var queryMods []qm.QueryMod
+	if len(mods) != 0 {
+		queryMods = append(queryMods, mods...)
+	}
+
+	queryMods = append(queryMods,
+		qm.Where("\"subscriptions\".\"feed_id\"=?", o.FeedID),
+	)
+
+	query := Subscriptions(queryMods...)
+	queries.SetFrom(query.Query, "\"subscriptions\"")
+
+	if len(queries.GetSelect(query.Query)) == 0 {
+		queries.SetSelect(query.Query, []string{"\"subscriptions\".*"})
+	}
+
+	return query
+}
+
 // LoadArticles allows an eager lookup of values, cached into the
 // loaded structs of the objects. This is for a 1-M or N-M relationship.
 func (feedL) LoadArticles(e boil.Executor, singular bool, maybeFeed interface{}, mods queries.Applicator) error {
@@ -305,6 +329,94 @@ func (feedL) LoadArticles(e boil.Executor, singular bool, maybeFeed interface{},
 	return nil
 }
 
+// LoadSubscriptions allows an eager lookup of values, cached into the
+// loaded structs of the objects. This is for a 1-M or N-M relationship.
+func (feedL) LoadSubscriptions(e boil.Executor, singular bool, maybeFeed interface{}, mods queries.Applicator) error {
+	var slice []*Feed
+	var object *Feed
+
+	if singular {
+		object = maybeFeed.(*Feed)
+	} else {
+		slice = *maybeFeed.(*[]*Feed)
+	}
+
+	args := make([]interface{}, 0, 1)
+	if singular {
+		if object.R == nil {
+			object.R = &feedR{}
+		}
+		args = append(args, object.FeedID)
+	} else {
+	Outer:
+		for _, obj := range slice {
+			if obj.R == nil {
+				obj.R = &feedR{}
+			}
+
+			for _, a := range args {
+				if a == obj.FeedID {
+					continue Outer
+				}
+			}
+
+			args = append(args, obj.FeedID)
+		}
+	}
+
+	if len(args) == 0 {
+		return nil
+	}
+
+	query := NewQuery(qm.From(`subscriptions`), qm.WhereIn(`subscriptions.feed_id in ?`, args...))
+	if mods != nil {
+		mods.Apply(query)
+	}
+
+	results, err := query.Query(e)
+	if err != nil {
+		return errors.Wrap(err, "failed to eager load subscriptions")
+	}
+
+	var resultSlice []*Subscription
+	if err = queries.Bind(results, &resultSlice); err != nil {
+		return errors.Wrap(err, "failed to bind eager loaded slice subscriptions")
+	}
+
+	if err = results.Close(); err != nil {
+		return errors.Wrap(err, "failed to close results in eager load on subscriptions")
+	}
+	if err = results.Err(); err != nil {
+		return errors.Wrap(err, "error occurred during iteration of eager loaded relations for subscriptions")
+	}
+
+	if singular {
+		object.R.Subscriptions = resultSlice
+		for _, foreign := range resultSlice {
+			if foreign.R == nil {
+				foreign.R = &subscriptionR{}
+			}
+			foreign.R.Feed = object
+		}
+		return nil
+	}
+
+	for _, foreign := range resultSlice {
+		for _, local := range slice {
+			if local.FeedID == foreign.FeedID {
+				local.R.Subscriptions = append(local.R.Subscriptions, foreign)
+				if foreign.R == nil {
+					foreign.R = &subscriptionR{}
+				}
+				foreign.R.Feed = local
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
 // AddArticlesG adds the given related objects to the existing relationships
 // of the feed, optionally inserting them as new records.
 // Appends related to o.R.Articles.
@@ -357,6 +469,67 @@ func (o *Feed) AddArticles(exec boil.Executor, insert bool, related ...*Article)
 	for _, rel := range related {
 		if rel.R == nil {
 			rel.R = &articleR{
+				Feed: o,
+			}
+		} else {
+			rel.R.Feed = o
+		}
+	}
+	return nil
+}
+
+// AddSubscriptionsG adds the given related objects to the existing relationships
+// of the feed, optionally inserting them as new records.
+// Appends related to o.R.Subscriptions.
+// Sets related.R.Feed appropriately.
+// Uses the global database handle.
+func (o *Feed) AddSubscriptionsG(insert bool, related ...*Subscription) error {
+	return o.AddSubscriptions(boil.GetDB(), insert, related...)
+}
+
+// AddSubscriptions adds the given related objects to the existing relationships
+// of the feed, optionally inserting them as new records.
+// Appends related to o.R.Subscriptions.
+// Sets related.R.Feed appropriately.
+func (o *Feed) AddSubscriptions(exec boil.Executor, insert bool, related ...*Subscription) error {
+	var err error
+	for _, rel := range related {
+		if insert {
+			rel.FeedID = o.FeedID
+			if err = rel.Insert(exec, boil.Infer()); err != nil {
+				return errors.Wrap(err, "failed to insert into foreign table")
+			}
+		} else {
+			updateQuery := fmt.Sprintf(
+				"UPDATE \"subscriptions\" SET %s WHERE %s",
+				strmangle.SetParamNames("\"", "\"", 1, []string{"feed_id"}),
+				strmangle.WhereClause("\"", "\"", 2, subscriptionPrimaryKeyColumns),
+			)
+			values := []interface{}{o.FeedID, rel.SubscriptionID}
+
+			if boil.DebugMode {
+				fmt.Fprintln(boil.DebugWriter, updateQuery)
+				fmt.Fprintln(boil.DebugWriter, values)
+			}
+			if _, err = exec.Exec(updateQuery, values...); err != nil {
+				return errors.Wrap(err, "failed to update foreign table")
+			}
+
+			rel.FeedID = o.FeedID
+		}
+	}
+
+	if o.R == nil {
+		o.R = &feedR{
+			Subscriptions: related,
+		}
+	} else {
+		o.R.Subscriptions = append(o.R.Subscriptions, related...)
+	}
+
+	for _, rel := range related {
+		if rel.R == nil {
+			rel.R = &subscriptionR{
 				Feed: o,
 			}
 		} else {
