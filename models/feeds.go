@@ -23,39 +23,44 @@ import (
 
 // Feed is an object representing the database table.
 type Feed struct {
-	FeedID    int       `boil:"feed_id" json:"feed_id" toml:"feed_id" yaml:"feed_id"`
-	Title     string    `boil:"title" json:"title" toml:"title" yaml:"title"`
-	URL       string    `boil:"url" json:"url" toml:"url" yaml:"url"`
-	CreatedAt null.Time `boil:"created_at" json:"created_at,omitempty" toml:"created_at" yaml:"created_at,omitempty"`
+	FeedID              int       `boil:"feed_id" json:"feed_id" toml:"feed_id" yaml:"feed_id"`
+	Title               string    `boil:"title" json:"title" toml:"title" yaml:"title"`
+	URL                 string    `boil:"url" json:"url" toml:"url" yaml:"url"`
+	RequestFailureCount int       `boil:"request_failure_count" json:"request_failure_count" toml:"request_failure_count" yaml:"request_failure_count"`
+	CreatedAt           null.Time `boil:"created_at" json:"created_at,omitempty" toml:"created_at" yaml:"created_at,omitempty"`
 
 	R *feedR `boil:"-" json:"-" toml:"-" yaml:"-"`
 	L feedL  `boil:"-" json:"-" toml:"-" yaml:"-"`
 }
 
 var FeedColumns = struct {
-	FeedID    string
-	Title     string
-	URL       string
-	CreatedAt string
+	FeedID              string
+	Title               string
+	URL                 string
+	RequestFailureCount string
+	CreatedAt           string
 }{
-	FeedID:    "feed_id",
-	Title:     "title",
-	URL:       "url",
-	CreatedAt: "created_at",
+	FeedID:              "feed_id",
+	Title:               "title",
+	URL:                 "url",
+	RequestFailureCount: "request_failure_count",
+	CreatedAt:           "created_at",
 }
 
 // Generated where
 
 var FeedWhere = struct {
-	FeedID    whereHelperint
-	Title     whereHelperstring
-	URL       whereHelperstring
-	CreatedAt whereHelpernull_Time
+	FeedID              whereHelperint
+	Title               whereHelperstring
+	URL                 whereHelperstring
+	RequestFailureCount whereHelperint
+	CreatedAt           whereHelpernull_Time
 }{
-	FeedID:    whereHelperint{field: "\"feeds\".\"feed_id\""},
-	Title:     whereHelperstring{field: "\"feeds\".\"title\""},
-	URL:       whereHelperstring{field: "\"feeds\".\"url\""},
-	CreatedAt: whereHelpernull_Time{field: "\"feeds\".\"created_at\""},
+	FeedID:              whereHelperint{field: "\"feeds\".\"feed_id\""},
+	Title:               whereHelperstring{field: "\"feeds\".\"title\""},
+	URL:                 whereHelperstring{field: "\"feeds\".\"url\""},
+	RequestFailureCount: whereHelperint{field: "\"feeds\".\"request_failure_count\""},
+	CreatedAt:           whereHelpernull_Time{field: "\"feeds\".\"created_at\""},
 }
 
 // FeedRels is where relationship names are stored.
@@ -82,9 +87,9 @@ func (*feedR) NewStruct() *feedR {
 type feedL struct{}
 
 var (
-	feedAllColumns            = []string{"feed_id", "title", "url", "created_at"}
+	feedAllColumns            = []string{"feed_id", "title", "url", "request_failure_count", "created_at"}
 	feedColumnsWithoutDefault = []string{"title", "url"}
-	feedColumnsWithDefault    = []string{"feed_id", "created_at"}
+	feedColumnsWithDefault    = []string{"feed_id", "request_failure_count", "created_at"}
 	feedPrimaryKeyColumns     = []string{"feed_id"}
 )
 

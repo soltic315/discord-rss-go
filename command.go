@@ -11,31 +11,41 @@ import (
 	"github.com/volatiletech/sqlboiler/queries/qm"
 )
 
-func createFeedAndCrawl(url string) (*models.Feed, error) {
-	rawFeed, err := gofeed.NewParser().ParseURL(url)
+func getOrCreateFeed(url string, title string) (*models.Feed, error) {
+	var feed *models.Feed
+
+	exists, err := models.Feeds(
+		models.FeedWhere.URL.EQ(url),
+	).ExistsG()
 	if err != nil {
 		slog.Error("Error occurred", "error", err)
 		return nil, err
 	}
-	slog.Debug("Fetch feed", "url", url)
-
-	feed := &models.Feed{
-		URL:   url,
-		Title: rawFeed.Title,
+	if exists {
+		feed, err = models.Feeds(
+			models.FeedWhere.URL.EQ(url),
+		).OneG()
+		if err != nil {
+			slog.Error("Error occurred", "error", err)
+			return nil, err
+		}
+	} else {
+		feed = &models.Feed{
+			URL:   url,
+			Title: title,
+		}
+		err = feed.InsertG(boil.Infer())
+		if err != nil {
+			slog.Error("Error occurred", "error", err)
+			return nil, err
+		}
+		slog.Info("Create feed", "url", feed.URL)
 	}
-	err = feed.InsertG(boil.Infer())
-	if err != nil {
-		slog.Error("Error occurred", "error", err)
-		return nil, err
-	}
-	slog.Info("Create feed", "url", feed.URL)
-
-	crawl(feed.FeedID, feed.URL, false)
 
 	return feed, nil
 }
 
-func feedSubscribeCommand(url string, channelID string, userName string) string {
+func feedSubscribeCommand(url string, channelID string) string {
 	var feed *models.Feed
 
 	exists, err := models.Subscriptions(
@@ -48,27 +58,17 @@ func feedSubscribeCommand(url string, channelID string, userName string) string 
 		return "フィードの取得中に不具合が発生しました"
 	}
 	if exists {
-		return fmt.Sprintf("このチャンネルにはすでにそのフィード（%s）が登録されています", url)
+		return fmt.Sprintf("このチャンネルにはすでにそのフィード(%s)が登録されています", url)
 	}
 
-	exists, err = models.Feeds(
-		models.FeedWhere.URL.EQ(url),
-	).ExistsG()
+	rawFeed, err := gofeed.NewParser().ParseURL(url)
 	if err != nil {
 		slog.Error("Error occurred", "error", err)
 		return "フィードの取得中に不具合が発生しました"
 	}
-	if !exists {
-		_, err = createFeedAndCrawl(url)
-		if err != nil {
-			slog.Error("Error occurred", "error", err)
-			return "フィードの取得中に不具合が発生しました"
-		}
-	}
+	slog.Debug("Fetch feed", "url", url)
 
-	feed, err = models.Feeds(
-		models.FeedWhere.URL.EQ(url),
-	).OneG()
+	feed, err = getOrCreateFeed(url, rawFeed.Title)
 	if err != nil {
 		slog.Error("Error occurred", "error", err)
 		return "フィードの取得中に不具合が発生しました"
@@ -77,7 +77,6 @@ func feedSubscribeCommand(url string, channelID string, userName string) string 
 	subscription := &models.Subscription{
 		FeedID:    feed.FeedID,
 		ChannelID: channelID,
-		CreatedBy: userName,
 	}
 	err = subscription.InsertG(boil.Infer())
 	if err != nil {
@@ -86,19 +85,17 @@ func feedSubscribeCommand(url string, channelID string, userName string) string 
 	}
 	slog.Info("Create subscription", "feedID", feed.FeedID, "ChannelID", channelID)
 
-	article, err := models.Articles(
-		qm.InnerJoin("feeds ON articles.feed_id = feeds.feed_id"),
-		qm.Where("feeds.url = ?", url),
-	).OneG()
-	if err != nil {
-		slog.Error("Error occurred", "error", err)
-		return "フィードの取得中に不具合が発生しました"
+	content := fmt.Sprintf("フィード[%s](%s)の購読が完了しました\n", rawFeed.Title, url)
+	if len(rawFeed.Items) != 0 {
+		content += fmt.Sprintf("> **📰 | %s**\n%s", rawFeed.Items[0].Title, rawFeed.Items[0].Link)
 	}
 
-	return fmt.Sprintf("購読フィード: %s\n**📰 | %s**\n%s", feed.Title, article.Title, article.Link)
+	return content
 }
 
 func feedListCommand(channelID string) string {
+	var status string
+
 	subscriptions, err := models.Subscriptions(
 		models.SubscriptionWhere.ChannelID.EQ(channelID),
 		qm.Load(models.SubscriptionRels.Feed),
@@ -115,8 +112,13 @@ func feedListCommand(channelID string) string {
 	for _, subscription := range subscriptions {
 		feed := subscription.R.Feed
 
-		content += fmt.Sprintf("ID: %d - タイトル: %s\n", subscription.SubscriptionID, feed.Title)
-		content += fmt.Sprintf("URL: %s\n", feed.URL)
+		if feed.RequestFailureCount <= CrawlingStopFailureCount {
+			status = "✅"
+		} else {
+			status = "🚫"
+		}
+
+		content += fmt.Sprintf("%s %s (ID: %d, URL: %s)\n", status, feed.Title, subscription.SubscriptionID, feed.URL)
 	}
 
 	return content
@@ -125,7 +127,7 @@ func feedListCommand(channelID string) string {
 func feedRemoveCommand(subscriptionID int) string {
 	subscription, err := models.FindSubscriptionG(subscriptionID)
 	if subscription == nil {
-		return fmt.Sprintf("フィード ID : %d を見つけられませんでした。", subscriptionID)
+		return fmt.Sprintf("フィード(ID: %d)を見つけられませんでした", subscriptionID)
 	}
 	if err != nil {
 		slog.Error("Error occurred", "error", err)
@@ -147,5 +149,5 @@ func feedRemoveCommand(subscriptionID int) string {
 
 	// TODO: Delete feed if no subscription
 
-	return fmt.Sprintf("フィード %d (%s) が削除されました", subscription.SubscriptionID, feed.Title)
+	return fmt.Sprintf("フィード[%s](%s) (ID: %d)が削除されました", feed.Title, feed.URL, subscription.SubscriptionID)
 }

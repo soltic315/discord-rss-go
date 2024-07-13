@@ -24,8 +24,9 @@ var (
 	DBName     = os.Getenv("DB_NAME")
 	DBPort     = os.Getenv("DB_PORT")
 
-	BotToken         = os.Getenv("BOT_TOKEN")
-	CrawlingInterval = 1
+	BotToken                 = os.Getenv("BOT_TOKEN")
+	CrawlingIntervalMinute   = 5
+	CrawlingStopFailureCount = 12
 )
 
 var s *discordgo.Session
@@ -43,7 +44,7 @@ func init() {
 
 	// Setup Scheduled Jobs
 	go func() {
-		ticker := time.NewTicker(time.Duration(CrawlingInterval) * time.Minute)
+		ticker := time.NewTicker(time.Duration(CrawlingIntervalMinute) * time.Minute)
 		defer ticker.Stop()
 
 		for range ticker.C {
@@ -56,22 +57,24 @@ func init() {
 func commandHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if i.Type == discordgo.InteractionApplicationCommand {
 		var content string
-		channelID := i.ChannelID
 		userName := i.Member.User.Username
 
 		options := i.ApplicationCommandData().Options
 		if len(options) > 0 {
-			switch options[0].Name {
+			command := options[0].Name
+
+			switch command {
 			case "subscribe":
 				options = options[0].Options
-				url := options[0].StringValue()
-				content = feedSubscribeCommand(url, channelID, userName)
+				slog.Info("Run Command", "command", command, "userName", userName, "option", options[0].StringValue())
+				content = feedSubscribeCommand(options[0].StringValue(), i.ChannelID)
 			case "list":
-				content = feedListCommand(channelID)
+				slog.Info("Run Command", "command", command, "userName", userName)
+				content = feedListCommand(i.ChannelID)
 			case "remove":
 				options = options[0].Options
-				subscriptionID := int(options[0].IntValue())
-				content = feedRemoveCommand(subscriptionID)
+				slog.Info("Run Command", "command", command, "userName", userName, "option", options[0].IntValue())
+				content = feedRemoveCommand(int(options[0].IntValue()))
 			}
 
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{

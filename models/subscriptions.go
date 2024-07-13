@@ -26,7 +26,6 @@ type Subscription struct {
 	SubscriptionID int       `boil:"subscription_id" json:"subscription_id" toml:"subscription_id" yaml:"subscription_id"`
 	FeedID         int       `boil:"feed_id" json:"feed_id" toml:"feed_id" yaml:"feed_id"`
 	ChannelID      string    `boil:"channel_id" json:"channel_id" toml:"channel_id" yaml:"channel_id"`
-	CreatedBy      string    `boil:"created_by" json:"created_by" toml:"created_by" yaml:"created_by"`
 	CreatedAt      null.Time `boil:"created_at" json:"created_at,omitempty" toml:"created_at" yaml:"created_at,omitempty"`
 
 	R *subscriptionR `boil:"-" json:"-" toml:"-" yaml:"-"`
@@ -37,13 +36,11 @@ var SubscriptionColumns = struct {
 	SubscriptionID string
 	FeedID         string
 	ChannelID      string
-	CreatedBy      string
 	CreatedAt      string
 }{
 	SubscriptionID: "subscription_id",
 	FeedID:         "feed_id",
 	ChannelID:      "channel_id",
-	CreatedBy:      "created_by",
 	CreatedAt:      "created_at",
 }
 
@@ -53,13 +50,11 @@ var SubscriptionWhere = struct {
 	SubscriptionID whereHelperint
 	FeedID         whereHelperint
 	ChannelID      whereHelperstring
-	CreatedBy      whereHelperstring
 	CreatedAt      whereHelpernull_Time
 }{
 	SubscriptionID: whereHelperint{field: "\"subscriptions\".\"subscription_id\""},
 	FeedID:         whereHelperint{field: "\"subscriptions\".\"feed_id\""},
 	ChannelID:      whereHelperstring{field: "\"subscriptions\".\"channel_id\""},
-	CreatedBy:      whereHelperstring{field: "\"subscriptions\".\"created_by\""},
 	CreatedAt:      whereHelpernull_Time{field: "\"subscriptions\".\"created_at\""},
 }
 
@@ -84,8 +79,8 @@ func (*subscriptionR) NewStruct() *subscriptionR {
 type subscriptionL struct{}
 
 var (
-	subscriptionAllColumns            = []string{"subscription_id", "feed_id", "channel_id", "created_by", "created_at"}
-	subscriptionColumnsWithoutDefault = []string{"feed_id", "channel_id", "created_by"}
+	subscriptionAllColumns            = []string{"subscription_id", "feed_id", "channel_id", "created_at"}
+	subscriptionColumnsWithoutDefault = []string{"feed_id", "channel_id"}
 	subscriptionColumnsWithDefault    = []string{"subscription_id", "created_at"}
 	subscriptionPrimaryKeyColumns     = []string{"subscription_id"}
 )

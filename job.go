@@ -12,25 +12,36 @@ import (
 	"github.com/volatiletech/sqlboiler/queries/qm"
 )
 
-func crawl(feedID int, url string, needNotify bool) {
-	rawFeed, err := gofeed.NewParser().ParseURL(url)
-	if err != nil {
-		slog.Error("Error occurred", "error", err)
-		return
-	}
-	slog.Debug("Fetch feed", "url", url)
-
-	for _, item := range rawFeed.Items {
-		if item == nil {
-			break
+func crawl(feed *models.Feed, needNotify bool) {
+	rawFeed, err := gofeed.NewParser().ParseURL(feed.URL)
+	if err == nil {
+		feed.RequestFailureCount = 0
+		_, updateErr := feed.UpdateG(boil.Infer())
+		if updateErr != nil {
+			slog.Error("Error occurred", "error", updateErr)
+			return
 		}
 
+		slog.Debug("Fetch feed", "url", feed.URL)
+	} else {
+		feed.RequestFailureCount = feed.RequestFailureCount + 1
+		_, updateErr := feed.UpdateG(boil.Infer())
+		if updateErr != nil {
+			slog.Error("Error occurred", "error", updateErr)
+			return
+		}
+
+		slog.Error("Failed to fetch feed", "error", err, "requestFailureCount", feed.RequestFailureCount)
+		return
+	}
+
+	for _, item := range rawFeed.Items {
 		title := item.Title
 		link := item.Link
 		publishedAt := *item.PublishedParsed
 
 		exists, err := models.Articles(
-			models.ArticleWhere.FeedID.EQ(feedID),
+			models.ArticleWhere.FeedID.EQ(feed.FeedID),
 			models.ArticleWhere.PublishedAt.EQ(publishedAt),
 		).ExistsG()
 		if err != nil {
@@ -38,12 +49,12 @@ func crawl(feedID int, url string, needNotify bool) {
 			continue
 		}
 		if exists {
-			slog.Debug("Article already exists", "feedID", feedID, "title", title)
+			slog.Debug("Article already exists", "feedID", feed.FeedID, "title", title)
 			continue
 		}
 
 		article := &models.Article{
-			FeedID:      feedID,
+			FeedID:      feed.FeedID,
 			Title:       title,
 			Link:        link,
 			NeedNotify:  needNotify,
@@ -55,25 +66,36 @@ func crawl(feedID int, url string, needNotify bool) {
 			slog.Error("Error occurred", "error", err)
 			continue
 		}
-		slog.Debug("Create article", "feedID", feedID, "title", title)
+		slog.Info("Create article", "feedID", feed.FeedID, "title", title, "needNotify", needNotify)
 	}
 }
 
 func crawlingJob() {
-	slog.Debug("Start Crawling")
+	slog.Info("Start Crawling")
 
-	feeds, err := models.Feeds().AllG()
+	feeds, err := models.Feeds(
+		models.FeedWhere.RequestFailureCount.LTE(CrawlingStopFailureCount),
+		// TODO: filter subscription exists
+	).AllG()
 	if err != nil {
 		slog.Error("Error occurred", "error", err)
 		return
 	}
 
 	for _, feed := range feeds {
-		crawl(feed.FeedID, feed.URL, true)
+		needNotify, err := models.Articles(
+			qm.Where("feed_id = ?", feed.FeedID),
+		).ExistsG()
+		if err != nil {
+			slog.Error("Error occurred", "error", err)
+			return
+		}
+
+		crawl(feed, needNotify)
 		time.Sleep(1 * time.Second)
 	}
 
-	slog.Debug("Finish Crawling")
+	slog.Info("Finish Crawling")
 }
 
 func notify(channelID string, msg string) error {
@@ -85,7 +107,7 @@ func notify(channelID string, msg string) error {
 }
 
 func notificationJob() {
-	slog.Debug("Start Notification")
+	slog.Info("Start Notification")
 
 	articles, err := models.Articles(
 		models.ArticleWhere.NeedNotify.EQ(true),
@@ -122,5 +144,5 @@ func notificationJob() {
 		}
 	}
 
-	slog.Debug("Finish Notification")
+	slog.Info("Finish Notification")
 }

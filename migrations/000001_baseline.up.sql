@@ -2,6 +2,7 @@ CREATE TABLE feeds (
     feed_id SERIAL PRIMARY KEY,
     title VARCHAR(100) NOT NULL,
     url VARCHAR(100) NOT NULL,
+    request_failure_count INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     UNIQUE (url)
@@ -24,7 +25,6 @@ CREATE TABLE subscriptions (
     subscription_id SERIAL PRIMARY KEY,
     feed_id INTEGER NOT NULL,
     channel_id VARCHAR(100) NOT NULL,
-    created_by VARCHAR(100) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (feed_id) REFERENCES feeds(feed_id),
