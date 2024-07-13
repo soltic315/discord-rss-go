@@ -6,10 +6,10 @@ setup:
 	go install github.com/volatiletech/sqlboiler/drivers/sqlboiler-psql@latest
 
 migrate-up:
-	migrate -database postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable -path migrations up
+	migrate -database postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${SSL_MODE} -path migrations up
 
 migrate-down:
-	migrate -database postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable -path migrations down
+	migrate -database postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${SSL_MODE} -path migrations down
 
 gen-models:
 	sqlboiler psql

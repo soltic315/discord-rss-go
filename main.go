@@ -24,6 +24,7 @@ var (
 	DBPassword = os.Getenv("DB_PASSWORD")
 	DBName     = os.Getenv("DB_NAME")
 	DBPort     = os.Getenv("DB_PORT")
+	SslMode    = os.Getenv("SSL_MODE")
 
 	BotToken                 = os.Getenv("BOT_TOKEN")
 	CrawlingIntervalMinute   = 5
@@ -140,8 +141,8 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	// Setup DB
 	dsn := fmt.Sprintf(
-		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=Asia/Tokyo",
-		DBHost, DBUser, DBPassword, DBName, DBPort,
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=Asia/Tokyo",
+		DBHost, DBUser, DBPassword, DBName, DBPort, SslMode,
 	)
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
