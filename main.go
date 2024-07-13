@@ -24,10 +24,10 @@ var (
 	DBPassword = os.Getenv("DB_PASSWORD")
 	DBName     = os.Getenv("DB_NAME")
 	DBPort     = os.Getenv("DB_PORT")
-	DBSslMode    = os.Getenv("DB_SSL_MODE")
+	DBSslMode  = os.Getenv("DB_SSL_MODE")
 
 	BotToken                 = os.Getenv("BOT_TOKEN")
-	CrawlingIntervalMinute   = 5
+	CrawlingIntervalMinute   = 1
 	CrawlingStopFailureCount = 12
 )
 
@@ -133,11 +133,6 @@ func createCommand() *discordgo.ApplicationCommand {
 	return parentCommand
 }
 
-// For Koyeb
-func httpHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hello, World")
-}
-
 func main() {
 	// Setup DB
 	dsn := fmt.Sprintf(
@@ -175,8 +170,10 @@ func main() {
 		panic(err)
 	}
 
+	slog.Error("Bot running")
+
 	// For Koyeb
-	http.HandleFunc("/", httpHandler)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintf(w, "Hello, World") })
 	http.ListenAndServe(":8000", nil)
 
 	ch := make(chan os.Signal, 1)

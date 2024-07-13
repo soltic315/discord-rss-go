@@ -39,7 +39,7 @@ func getOrCreateFeed(url string, title string) (*models.Feed, error) {
 			slog.Error("Error occurred", "error", err)
 			return nil, err
 		}
-		slog.Info("Create feed", "url", feed.URL)
+		slog.Info("Create feed", "feedID", feed.FeedID)
 	}
 
 	return feed, nil
@@ -83,7 +83,7 @@ func feedSubscribeCommand(url string, channelID string) string {
 		slog.Error("Error occurred", "error", err)
 		return "フィードの取得中に不具合が発生しました"
 	}
-	slog.Info("Create subscription", "feedID", feed.FeedID, "ChannelID", channelID)
+	slog.Info("Create subscription", "subscriptionID", subscription.SubscriptionID)
 
 	content := fmt.Sprintf("フィード[%s](%s)の購読が完了しました\n", rawFeed.Title, url)
 	if len(rawFeed.Items) != 0 {
@@ -139,15 +139,17 @@ func feedRemoveCommand(subscriptionID int) string {
 		slog.Error("Error occurred", "error", err)
 		return "フィードの取得中に不具合が発生しました"
 	}
-	slog.Info("Delete feed", "subscriptionID", subscriptionID)
+	slog.Info("Delete subscription",
+		"subscriptionID", subscription.SubscriptionID,
+		"feedID", subscription.FeedID,
+		"channelID", subscription.ChannelID,
+	)
 
 	feed, err := models.FindFeedG(subscription.FeedID)
 	if err != nil {
 		slog.Error("Error occurred", "error", err)
 		return "フィードの取得中に不具合が発生しました"
 	}
-
-	// TODO: Delete feed if no subscription
 
 	return fmt.Sprintf("フィード[%s](%s) (ID: %d)が削除されました", feed.Title, feed.URL, subscription.SubscriptionID)
 }

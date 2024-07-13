@@ -66,7 +66,7 @@ func crawl(feed *models.Feed, needNotify bool) {
 			slog.Error("Error occurred", "error", err)
 			continue
 		}
-		slog.Info("Create article", "feedID", feed.FeedID, "title", title, "needNotify", needNotify)
+		slog.Info("Create article", "articleId", article.ArticleID)
 	}
 }
 
@@ -74,8 +74,8 @@ func crawlingJob() {
 	slog.Info("Start Crawling")
 
 	feeds, err := models.Feeds(
-		models.FeedWhere.RequestFailureCount.LTE(CrawlingStopFailureCount),
-		// TODO: filter subscription exists
+		qm.InnerJoin("subscriptions ON feeds.feed_id = subscriptions.feed_id"),
+		qm.Where("feeds.request_failure_count <= ?", CrawlingStopFailureCount),
 	).AllG()
 	if err != nil {
 		slog.Error("Error occurred", "error", err)
