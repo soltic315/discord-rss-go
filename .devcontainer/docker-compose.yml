@@ -12,7 +12,7 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: postgres
-      SSL_MODE: disable
+      DB_SSL_MODE: disable
   db:
     image: postgres:latest
     restart: unless-stopped
