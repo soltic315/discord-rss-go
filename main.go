@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -131,6 +132,11 @@ func createCommand() *discordgo.ApplicationCommand {
 	return parentCommand
 }
 
+// For Koyeb
+func httpHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "Hello, World")
+}
+
 func main() {
 	// Setup DB
 	dsn := fmt.Sprintf(
@@ -167,6 +173,10 @@ func main() {
 		slog.Error("Error occurred", "error", err)
 		panic(err)
 	}
+
+	// For Koyeb
+	http.HandleFunc("/", httpHandler)
+	http.ListenAndServe(":8080", nil)
 
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)

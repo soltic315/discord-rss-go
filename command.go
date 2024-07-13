@@ -87,7 +87,7 @@ func feedSubscribeCommand(url string, channelID string) string {
 
 	content := fmt.Sprintf("フィード[%s](%s)の購読が完了しました\n", rawFeed.Title, url)
 	if len(rawFeed.Items) != 0 {
-		content += fmt.Sprintf("> **📰 | %s**\n%s", rawFeed.Items[0].Title, rawFeed.Items[0].Link)
+		content += fmt.Sprintf("> **📰 | %s**\n> %s", rawFeed.Items[0].Title, rawFeed.Items[0].Link)
 	}
 
 	return content
