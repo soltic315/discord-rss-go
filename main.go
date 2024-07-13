@@ -177,7 +177,7 @@ func main() {
 
 	// For Koyeb
 	http.HandleFunc("/", httpHandler)
-	http.ListenAndServe(":8080", nil)
+	http.ListenAndServe(":8000", nil)
 
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
